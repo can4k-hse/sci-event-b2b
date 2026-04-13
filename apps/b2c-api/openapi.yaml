@@ -1,0 +1,874 @@
+openapi: 3.1.0
+info:
+  title: sci-event B2C API
+  version: 1.0.0
+  description: REST API для B2C-приложения sci-event
+
+servers:
+  - url: https://api.sci-event.ru/v1
+    description: Production
+  - url: http://localhost:8080/v1
+    description: Local
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: users
+  - name: events
+  - name: slots
+  - name: talks
+  - name: notifications
+
+paths:
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────
+
+  /auth/send-code:
+    post:
+      tags: [auth]
+      summary: Отправить SMS с кодом подтверждения
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendCodeRequest'
+      responses:
+        '200':
+          description: Код отправлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/verify-code:
+    post:
+      tags: [auth]
+      summary: Проверить SMS-код и получить токены
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyCodeRequest'
+      responses:
+        '200':
+          description: Авторизация успешна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Обновить access-токен через refresh-токен
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Новый access-токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Инвалидировать refresh-токен
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Выход выполнен
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── USERS ───────────────────────────────────────────────────────────────
+
+  /users/me:
+    get:
+      tags: [users]
+      summary: Получить профиль текущего пользователя с QR-кодом
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [users]
+      summary: Обновить профиль (ФИО, организация и т.д.)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/interests:
+    patch:
+      tags: [users]
+      summary: Обновить интересы и предпочтения пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInterestsRequest'
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/avatar:
+    patch:
+      tags: [users]
+      summary: Загрузить или обновить фото профиля
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: Файл изображения (JPEG/PNG, макс. 5 МБ)
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/notifications-settings:
+    patch:
+      tags: [users]
+      summary: Обновить настройки уведомлений
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: Обновлённые настройки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── EVENTS ──────────────────────────────────────────────────────────────
+
+  /events:
+    get:
+      tags: [events]
+      summary: Все опубликованные мероприятия
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Полнотекстовый поиск по названию
+        - name: date_from
+          in: query
+          schema:
+            type: integer
+          description: Фильтр по дате начала (unix timestamp)
+        - name: date_to
+          in: query
+          schema:
+            type: integer
+          description: Фильтр по дате окончания (unix timestamp)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Список мероприятий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /events/my:
+    get:
+      tags: [events]
+      summary: Мероприятия, на которые зарегистрирован пользователь
+      responses:
+        '200':
+          description: Список мероприятий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /events/{event_id}:
+    get:
+      tags: [events]
+      summary: Детальная информация о мероприятии
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Мероприятие
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /events/{event_id}/program:
+    get:
+      tags: [events]
+      summary: Программа мероприятия — слоты и выбранные доклады пользователя
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Программа мероприятия
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventProgram'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /events/{event_id}/register:
+    post:
+      tags: [events]
+      summary: Зарегистрироваться на мероприятие
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '201':
+          description: Регистрация создана
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [events]
+      summary: Отменить регистрацию на мероприятие
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '204':
+          description: Регистрация отменена
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── SLOTS ───────────────────────────────────────────────────────────────
+
+  /events/{event_id}/slots/{slot_id}/talks:
+    get:
+      tags: [slots]
+      summary: Все доклады в слоте
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/SlotId'
+      responses:
+        '200':
+          description: Список докладов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TalkSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /events/{event_id}/slots/{slot_id}/select:
+    post:
+      tags: [slots]
+      summary: Выбрать доклад в слоте
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/SlotId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectTalkRequest'
+      responses:
+        '201':
+          description: Доклад выбран
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [slots]
+      summary: Убрать выбор доклада в слоте (оставить слот пустым)
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/SlotId'
+      responses:
+        '204':
+          description: Выбор убран
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── TALKS ───────────────────────────────────────────────────────────────
+
+  /talks/{talk_id}:
+    get:
+      tags: [talks]
+      summary: Детальная страница доклада
+      parameters:
+        - $ref: '#/components/parameters/TalkId'
+      responses:
+        '200':
+          description: Доклад
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TalkDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── NOTIFICATIONS ────────────────────────────────────────────────────────
+
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Список всех уведомлений пользователя
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Список уведомлений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/{notification_id}:
+    get:
+      tags: [notifications]
+      summary: Текст конкретного уведомления
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      responses:
+        '200':
+          description: Уведомление
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /notifications/read-all:
+    post:
+      tags: [notifications]
+      summary: Отметить все уведомления как прочитанные
+      responses:
+        '204':
+          description: Все уведомления прочитаны
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ─── COMPONENTS ──────────────────────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    EventId:
+      name: event_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    SlotId:
+      name: slot_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    TalkId:
+      name: talk_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    NotificationId:
+      name: notification_id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Конфликт (например, уже зарегистрирован)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Слишком много запросов
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    # ── Auth ─────────────────────────────────────────────────────────────
+
+    SendCodeRequest:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+          description: Номер телефона в формате E.164
+          example: '+79001234567'
+
+    VerifyCodeRequest:
+      type: object
+      required: [phone, code]
+      properties:
+        phone:
+          type: string
+          example: '+79001234567'
+        code:
+          type: string
+          minLength: 4
+          maxLength: 6
+          example: '1234'
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Время жизни access-токена в секундах
+
+    AccessToken:
+      type: object
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+
+    # ── User ─────────────────────────────────────────────────────────────
+
+    UserProfile:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        name:
+          type: string
+        surname:
+          type: string
+        phone:
+          type: string
+        organization:
+          type: ['string', 'null']
+        avatar_url:
+          type: ['string', 'null']
+          format: uri
+        qr_code:
+          type: string
+          description: Base64-encoded QR-код для идентификации на мероприятии
+        interests:
+          type: array
+          items:
+            type: string
+        notification_settings:
+          $ref: '#/components/schemas/NotificationSettings'
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        surname:
+          type: string
+        organization:
+          type: string
+
+    UpdateInterestsRequest:
+      type: object
+      required: [interests]
+      properties:
+        interests:
+          type: array
+          items:
+            type: string
+
+    NotificationSettings:
+      type: object
+      properties:
+        push_enabled:
+          type: boolean
+
+    # ── Event ─────────────────────────────────────────────────────────────
+
+    EventSummary:
+      type: object
+      properties:
+        event_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        start_time:
+          type: integer
+          description: Unix timestamp начала мероприятия
+        place:
+          $ref: '#/components/schemas/Place'
+        company:
+          $ref: '#/components/schemas/Company'
+        is_registered:
+          type: boolean
+          description: Зарегистрирован ли текущий пользователь
+
+    EventDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventSummary'
+        - type: object
+          properties:
+            speakers:
+              type: array
+              items:
+                $ref: '#/components/schemas/SpeakerSummary'
+            video_url:
+              type: ['string', 'null']
+              format: uri
+
+    EventListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+
+    EventProgram:
+      type: object
+      properties:
+        event_id:
+          type: integer
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlotWithSelection'
+
+    # ── Slot ──────────────────────────────────────────────────────────────
+
+    SlotWithSelection:
+      type: object
+      properties:
+        slot_id:
+          type: integer
+        time:
+          type: integer
+          description: Unix timestamp начала слота
+        venue:
+          $ref: '#/components/schemas/Venue'
+        selected_talk:
+          oneOf:
+            - $ref: '#/components/schemas/TalkSummary'
+            - type: 'null'
+          description: Выбранный пользователем доклад, null если не выбран
+
+    SelectTalkRequest:
+      type: object
+      required: [talk_id]
+      properties:
+        talk_id:
+          type: integer
+
+    # ── Talk / Presentation ───────────────────────────────────────────────
+
+    TalkSummary:
+      type: object
+      properties:
+        talk_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        duration:
+          type: integer
+          description: Продолжительность в минутах
+        speakers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpeakerSummary'
+
+    TalkDetail:
+      allOf:
+        - $ref: '#/components/schemas/TalkSummary'
+        - type: object
+          properties:
+            slot:
+              type: object
+              properties:
+                slot_id:
+                  type: integer
+                time:
+                  type: integer
+                venue:
+                  $ref: '#/components/schemas/Venue'
+
+    # ── Speaker ───────────────────────────────────────────────────────────
+
+    SpeakerSummary:
+      type: object
+      properties:
+        speaker_id:
+          type: integer
+        name:
+          type: string
+        surname:
+          type: string
+        avatar_url:
+          type: ['string', 'null']
+          format: uri
+        institute:
+          $ref: '#/components/schemas/Institute'
+
+    # ── Place / Venue / Company ────────────────────────────────────────────
+
+    Place:
+      type: object
+      properties:
+        place_id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+
+    Venue:
+      type: object
+      properties:
+        venue_id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+        floor:
+          type: ['integer', 'null']
+
+    Company:
+      type: object
+      properties:
+        company_id:
+          type: integer
+        name:
+          type: string
+
+    Institute:
+      type: object
+      properties:
+        institute_id:
+          type: integer
+        name:
+          type: string
+
+    # ── Notifications ─────────────────────────────────────────────────────
+
+    NotificationSummary:
+      type: object
+      properties:
+        notification_id:
+          type: integer
+        title:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: integer
+          description: Unix timestamp создания
+
+    NotificationDetail:
+      allOf:
+        - $ref: '#/components/schemas/NotificationSummary'
+        - type: object
+          properties:
+            text:
+              type: string
+
+    NotificationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationSummary'
+        unread_count:
+          type: integer
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+
+    # ── Common ────────────────────────────────────────────────────────────
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Машиночитаемый код ошибки
+        message:
+          type: string
+          description: Человекочитаемое сообщение

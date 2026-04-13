@@ -1,0 +1,33 @@
+AUTH
+POST /auth/send-code          # отправить SMS на номер телефона
+POST /auth/verify-code        # проверить код → вернуть access + refresh токен
+POST /auth/refresh            # обновить access токен через refresh
+POST /auth/logout             # инвалидировать refresh токен
+
+USER
+GET    /users/me              # профиль + QR-код (кешируем локально)
+PATCH  /users/me              # редактирование профиля (ФИО, email, org...)
+PATCH  /users/me/interests    # обновить интересы и предпочтения
+PATCH  /users/me/avatar       # загрузить/обновить фото профиля
+PATCH  /users/me/notifications-settings  # настройки уведомлений
+
+EVENTS
+GET  /events                  # все опубликованные мероприятия (с фильтрами)
+GET  /events/my               # мои мероприятия (зарегистрирован)
+GET  /events/{event_id}       # основная инфа: описание, спикеры, место, видео
+GET  /events/{event_id}/program         # программа: слоты + моё расписание
+POST /events/{event_id}/register        # зарегистрироваться на мероприятие
+DELETE /events/{event_id}/register      # отменить регистрацию
+
+SLOTS
+GET  /events/{event_id}/slots/{slot_id}/talks   # все доклады на данный слот
+POST /events/{event_id}/slots/{slot_id}/select  # выбрать доклад в слот
+DELETE /events/{event_id}/slots/{slot_id}/select  # убрать выбор (пустой слот)
+
+TALKS
+GET  /talks/{talk_id}                   # детальная страница доклада
+
+NOTIFICATIONS
+GET  /notifications                     # список всех моих уведомлений
+GET  /notifications/{notification_id}   # текст конкретного уведомления
+POST /notifications/read-all            # отметить все как прочитанные
