@@ -1,0 +1,51 @@
+#!/bin/sh
+set -e
+
+ENV=${1:-dev}
+DROP=0
+if [ "${2:-}" = "--drop" ]; then DROP=1; fi
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+API_DIR="$SCRIPT_DIR/apps/b2c-api"
+COMPOSE="docker compose -f $SCRIPT_DIR/docker-compose.yml"
+
+case "$ENV" in
+  dev)
+    [ -f "$API_DIR/.env.dev" ] || cp "$API_DIR/.env.dev.example" "$API_DIR/.env.dev"
+
+    CERTS_DIR="$SCRIPT_DIR/certs"
+    mkdir -p "$CERTS_DIR"
+    if [ ! -f "$CERTS_DIR/cert.pem" ]; then
+      echo "Генерируем TLS-сертификат..."
+      mkcert -install
+      mkcert -cert-file "$CERTS_DIR/cert.pem" -key-file "$CERTS_DIR/key.pem" localhost 127.0.0.1
+    fi
+
+    if [ "$DROP" = "1" ]; then
+      echo "Дропаем БД и пересоздаём..."
+      $COMPOSE --env-file "$API_DIR/.env.dev" down -v
+    fi
+
+    docker --log-level debug compose -f "$SCRIPT_DIR/docker-compose.yml" --env-file "$API_DIR/.env.dev" up -d
+    echo "Ждём запуска API..."
+    until curl -sf https://localhost/health > /dev/null; do sleep 1; done
+    $COMPOSE exec api python scripts/seed.py
+    echo ""
+    echo "✓ Dev окружение запущено"
+    echo "  API:     https://localhost"
+    echo "  Swagger: https://localhost/docs"
+    echo "  DB:      localhost:5432"
+    echo ""
+    $COMPOSE logs -f
+    ;;
+
+  test)
+    [ -f "$API_DIR/.env.test" ] || cp "$API_DIR/.env.test.example" "$API_DIR/.env.test"
+    docker --log-level debug compose -f "$SCRIPT_DIR/docker-compose.yml" --env-file "$API_DIR/.env.test" --profile test up
+    ;;
+
+  *)
+    echo "Usage: bootstrap.sh [dev|test] [--drop]"
+    exit 1
+    ;;
+esac
