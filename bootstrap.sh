@@ -35,6 +35,7 @@ case "$ENV" in
     echo "  API:     https://localhost"
     echo "  Swagger: https://localhost/docs"
     echo "  DB:      localhost:5432"
+    echo "  Adminer: http://localhost:8090"
     echo ""
     $COMPOSE logs -f
     ;;
