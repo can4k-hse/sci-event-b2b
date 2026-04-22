@@ -26,9 +26,9 @@ case "$ENV" in
       $COMPOSE --env-file "$API_DIR/.env.dev" down -v
     fi
 
-    docker --log-level debug compose -f "$SCRIPT_DIR/docker-compose.yml" --env-file "$API_DIR/.env.dev" up -d
+    $COMPOSE --env-file "$API_DIR/.env.dev" up -d --build
     echo "Ждём запуска API..."
-    until curl -sf https://localhost/health > /dev/null; do sleep 1; done
+    until curl -sfk https://localhost/health > /dev/null; do sleep 1; done
     $COMPOSE exec api python scripts/seed.py
     echo ""
     echo "✓ Dev окружение запущено"
