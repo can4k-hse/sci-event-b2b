@@ -33,7 +33,7 @@ class AuthService:
         return count >= settings.otp_rate_limit_count
 
     async def create_otp(self, db: AsyncSession, phone: str) -> str:
-        code = str(random.randint(1000, 9999))
+        code = str(random.randint(100000, 999999))
         expires_at = datetime.now(tz=timezone.utc) + timedelta(
             minutes=settings.otp_expire_minutes
         )

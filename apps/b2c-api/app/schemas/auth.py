@@ -33,8 +33,8 @@ class VerifyCodeRequest(BaseModel):
     @field_validator("code")
     @classmethod
     def code_format(cls, v: str) -> str:
-        if not (4 <= len(v) <= 6):
-            raise ValueError("Code must be 4–6 digits")
+        if len(v) != 6:
+            raise ValueError("Code must be exactly 6 digits")
         if not v.isdigit():
             raise ValueError("Code must contain digits only")
         return v

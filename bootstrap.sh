@@ -42,7 +42,14 @@ case "$ENV" in
 
   test)
     [ -f "$API_DIR/.env.test" ] || cp "$API_DIR/.env.test.example" "$API_DIR/.env.test"
-    docker --log-level debug compose -f "$SCRIPT_DIR/docker-compose.yml" --env-file "$API_DIR/.env.test" --profile test up
+    $COMPOSE --env-file "$API_DIR/.env.test" --profile test up -d db-test
+    echo "Ждём тестовую БД..."
+    until $COMPOSE --profile test exec db-test \
+      pg_isready -U scievent > /dev/null 2>&1; do sleep 1; done
+    $COMPOSE --profile test run --rm \
+      -e TEST_DATABASE_URL=postgresql+asyncpg://scievent:scievent@db-test:5432/scievent_test \
+      --no-deps \
+      api uv run pytest tests/ -v --cov=app --cov-report=term-missing
     ;;
 
   *)
