@@ -50,7 +50,7 @@ async def _create_slot(db: AsyncSession, event_id: int) -> Slot:
 
 
 async def _create_talk(db: AsyncSession, slot_id: int, title: str = "Talk") -> Talk:
-    talk = Talk(slot_id=slot_id, title=title, speaker="Speaker Name")
+    talk = Talk(slot_id=slot_id, title=title, speakers=["Alice Smith", "Bob Jones"])
     db.add(talk)
     await db.commit()
     await db.refresh(talk)

@@ -1,12 +1,15 @@
 from pydantic import BaseModel
 
 
-class TalkResponse(BaseModel):
+class TalkDetailResponse(BaseModel):
     talk_id: int
     slot_id: int
     title: str
-    speaker: str | None
+    speakers: list[str]
     description: str | None
+
+
+class TalkResponse(TalkDetailResponse):
     is_selected: bool
 
 

@@ -22,7 +22,7 @@ def _talk_to_response(talk: Talk, selected_talk_id: int | None) -> TalkResponse:
         talk_id=talk.talk_id,
         slot_id=talk.slot_id,
         title=talk.title,
-        speaker=talk.speaker,
+        speakers=talk.speakers or [],
         description=talk.description,
         is_selected=talk.talk_id == selected_talk_id,
     )
