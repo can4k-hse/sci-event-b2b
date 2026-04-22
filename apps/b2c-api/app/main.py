@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import auth, users
+from app.routers import auth, slots, users
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,6 +63,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(users.router, prefix=API_PREFIX)
+app.include_router(slots.router, prefix=API_PREFIX)
 
 
 @app.get("/health", include_in_schema=False)
