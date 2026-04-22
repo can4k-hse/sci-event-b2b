@@ -30,7 +30,7 @@ async def clean_db(test_engine):
         await conn.execute(
             text(
                 "TRUNCATE users, otp_codes, refresh_tokens, "
-                "events, slots, talks, user_slot_selections "
+                "events, slots, talks, user_slot_selections, notifications "
                 "RESTART IDENTITY CASCADE"
             )
         )
