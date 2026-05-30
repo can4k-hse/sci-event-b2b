@@ -2,7 +2,7 @@
 name = "sci-event-b2c-api"
 version = "0.1.0"
 description = "SciEvent B2C REST API"
-license = "UNLICENSED"
+license = "Unlicense"
 requires-python = ">=3.12"
 
 dependencies = [
